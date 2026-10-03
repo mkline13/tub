@@ -15,8 +15,14 @@
       "dependencies": {
         "@mkline13/tub-shared": "workspace:*",
       },
+      "devDependencies": {
+        "@mkline13/tub-server": "workspace:*",
+        "rxdb": "^16.21.1",
+        "rxjs": "^7.8.2",
+      },
       "peerDependencies": {
         "rxdb": "^16.0.0",
+        "rxjs": "^7.8.0",
       },
     },
     "packages/server": {

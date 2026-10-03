@@ -1,8 +1,21 @@
 {
   "name": "@mkline13/tub-shared",
   "version": "0.0.0",
-  "private": true,
+  "description": "Types shared by the Tub server and @mkline13/tub-client",
+  "license": "MIT",
   "type": "module",
   "main": "src/index.ts",
-  "types": "src/index.ts"
+  "types": "src/index.ts",
+  "files": [
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mkline13/tub.git",
+    "directory": "packages/shared"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  }
 }
