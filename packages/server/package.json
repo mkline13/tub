@@ -1,0 +1,17 @@
+{
+  "name": "@mkline13/tub-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "tub": "src/cli/index.ts" },
+  "scripts": {
+    "start": "bun src/server/index.ts",
+    "cli": "bun src/cli/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@mkline13/tub-shared": "workspace:*",
+    "ajv": "^8.17.0",
+    "fastify": "^5.0.0"
+  }
+}

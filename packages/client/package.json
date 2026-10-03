@@ -1,0 +1,15 @@
+{
+  "name": "@mkline13/tub-client",
+  "version": "0.0.0",
+  "description": "Thin RxDB replication helper for Tub",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": ["src"],
+  "repository": { "type": "git", "url": "git+https://github.com/mkline13/tub.git", "directory": "packages/client" },
+  "publishConfig": { "registry": "https://npm.pkg.github.com", "access": "restricted" },
+  "scripts": { "test": "bun test" },
+  "dependencies": { "@mkline13/tub-shared": "workspace:*" },
+  "peerDependencies": { "rxdb": "^16.0.0" }
+}
