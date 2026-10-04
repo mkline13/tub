@@ -4,6 +4,8 @@
 # Assumes Caddy runs in its own compose project attached to an external
 # network named "caddy" (create it once with `docker network create caddy`).
 # Rename it to match your setup.
+name: tub
+
 services:
   tub:
     build:
