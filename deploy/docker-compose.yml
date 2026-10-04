@@ -10,7 +10,7 @@ services:
   tub:
     build:
       context: ..
-    # or, with a prebuilt image: image: tub:latest
+    # or use the prebuilt image: image: ghcr.io/mkline13/tub:main
     container_name: tub
     restart: unless-stopped
     volumes:

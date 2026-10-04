@@ -96,6 +96,8 @@ Replication API, all requiring `Authorization: Bearer <secret>`:
 
 The `Dockerfile` builds a server image that keeps its database at `/data/tub.db` on a volume and serves plain HTTP on port 8787 with `TUB_BEHIND_PROXY=1`. It is meant to sit on a Docker network shared with Caddy, with no published port, so Caddy (which handles certificates) is the only way in. [`deploy/`](deploy) has an example `docker-compose.yml` and `Caddyfile`.
 
+A prebuilt image for amd64 and arm64 is published to `ghcr.io/mkline13/tub` on every push to `main` (tag `main`, plus `sha-<commit>`) and for version tags (`v1.2.3` publishes `1.2.3` and `1.2`). To use it instead of building, replace `build:` with `image: ghcr.io/mkline13/tub:main` in the compose file.
+
 1. Put Caddy and Tub on a shared network. The example assumes an external network named `caddy` (`docker network create caddy`) that your Caddy container also joins. Rename it to match your setup.
 2. Start Tub from a checkout of this repo:
    ```
