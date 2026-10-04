@@ -64,20 +64,24 @@ const MIGRATIONS: string[] = [
 /** Opens the Tub SQLite database and applies any pending migrations. */
 export function openDb(path = ":memory:"): Database {
   const db = new Database(path, { strict: true })
-  db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;")
+  // busy_timeout first, so switching to WAL also waits for other processes.
+  db.exec("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;")
   migrate(db)
   return db
 }
 
+/**
+ * Runs in one IMMEDIATE transaction that re-reads the version after taking
+ * the write lock, so two processes opening a new database at once (such as
+ * `tub init` and a `tub` admin command) cannot both apply a migration.
+ */
 export function migrate(db: Database): void {
-  const { user_version: current } = db.query("PRAGMA user_version").get() as { user_version: number }
-  if (current > MIGRATIONS.length) {
-    throw new Error(`database schema version ${current} is newer than this tub (${MIGRATIONS.length})`)
-  }
-  for (let v = current; v < MIGRATIONS.length; v++) {
-    db.transaction(() => {
-      db.exec(MIGRATIONS[v]!)
-      db.exec(`PRAGMA user_version = ${v + 1}`)
-    })()
-  }
+  db.transaction(() => {
+    const { user_version: current } = db.query("PRAGMA user_version").get() as { user_version: number }
+    if (current > MIGRATIONS.length) {
+      throw new Error(`database schema version ${current} is newer than this tub (${MIGRATIONS.length})`)
+    }
+    for (let v = current; v < MIGRATIONS.length; v++) db.exec(MIGRATIONS[v]!)
+    if (current < MIGRATIONS.length) db.exec(`PRAGMA user_version = ${MIGRATIONS.length}`)
+  }).immediate()
 }
