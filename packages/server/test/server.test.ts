@@ -16,6 +16,39 @@ test("health endpoint responds without auth", async () => {
   expect(res.json()).toEqual({ ok: true })
 })
 
+describe("CORS", () => {
+  test("answers preflights without auth", async () => {
+    const { call } = await fixture()
+    for (const [method, url] of [
+      ["GET", "/replication/tasks/pull"],
+      ["POST", "/replication/tasks/push"],
+      ["GET", "/replication/tasks/pull/stream"],
+    ] as const) {
+      const res = await call("OPTIONS", url, {
+        origin: "http://localhost:5173",
+        "access-control-request-method": method,
+        "access-control-request-headers": "authorization, content-type",
+      })
+      expect(res.status).toBe(204)
+      expect(res.headers.get("access-control-allow-origin")).toBe("*")
+      expect(res.headers.get("access-control-allow-methods")).toBe("GET, POST")
+      expect(res.headers.get("access-control-allow-headers")).toBe("authorization, content-type")
+    }
+  })
+
+  test("allows any origin to read responses, including errors", async () => {
+    const { both, call, pull } = await fixture()
+    expect((await pull(both.secret, "tasks")).headers.get("access-control-allow-origin")).toBe("*")
+    expect((await call("GET", "/replication/tasks/pull", {})).headers.get("access-control-allow-origin")).toBe("*")
+  })
+
+  test("a preflight is not an authorized request", async () => {
+    const { call } = await fixture()
+    const res = await call("OPTIONS", "/replication/tasks/pull", {})
+    expect(res.status).not.toBe(200)
+  })
+})
+
 describe("authentication", () => {
   test.each([
     ["missing", undefined],
@@ -267,6 +300,7 @@ describe("live stream", () => {
     {
       const tasks = await openStream(base, both.secret, "tasks")
       expect(tasks.res.headers.get("content-type")).toBe("text/event-stream")
+      expect(tasks.res.headers.get("access-control-allow-origin")).toBe("*")
       expect(await tasks.next()).toBe("retry: 5000\ndata: RESYNC")
 
       await push(both.secret, "notes", [{ newDocumentState: task("n", "note") }])

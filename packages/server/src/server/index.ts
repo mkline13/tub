@@ -60,6 +60,24 @@ export function buildServer(options: ServerOptions) {
     for (const close of openStreams) close()
   })
 
+  /**
+   * CORS, so browser apps on any origin can sync. Allowing every origin is
+   * safe because authorization is a bearer secret the app sends explicitly:
+   * browsers never attach it on their own, so another site can't act with it.
+   * Preflights are answered here, before the replication auth hook runs.
+   */
+  app.addHook("onRequest", async (request, reply) => {
+    reply.header("access-control-allow-origin", "*")
+    if (request.method === "OPTIONS" && request.headers["access-control-request-method"]) {
+      return reply
+        .code(204)
+        .header("access-control-allow-methods", "GET, POST")
+        .header("access-control-allow-headers", "authorization, content-type")
+        .header("access-control-max-age", "86400")
+        .send()
+    }
+  })
+
   app.get("/health", async () => ({ ok: true }))
 
   /**
@@ -133,6 +151,7 @@ export function buildServer(options: ServerOptions) {
           "cache-control": "no-cache, no-transform",
           connection: "keep-alive",
           "x-accel-buffering": "no",
+          "access-control-allow-origin": "*",
         })
 
         let closed = false
