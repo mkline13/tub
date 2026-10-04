@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { openDb } from "../src/db"
 import { revokeCredential } from "../src/db/credentials"
-import { isLoopback, serve } from "../src/server"
+import { configFromEnv, isLoopback, serve } from "../src/server"
 import { auth, fixture, task } from "./helpers"
 
 test("health endpoint responds without auth", async () => {
@@ -308,6 +308,25 @@ describe("serve", () => {
     const dbPath = tempDb()
     await expect(serve({ dbPath, host: "0.0.0.0", port: 0 })).rejects.toThrow(/TLS is required/)
     await expect(serve({ dbPath, host: "127.0.0.1", port: 0, tlsCert: "x" })).rejects.toThrow(/both a certificate and a key/)
+  })
+
+  test("serves plain HTTP on a non-loopback address only with the behind-proxy opt-in", async () => {
+    const dbPath = tempDb()
+    const app = await serve({ dbPath, host: "0.0.0.0", port: 0, behindProxy: true })
+    try {
+      const { port } = app.server.address() as AddressInfo
+      const res = await fetch(`http://127.0.0.1:${port}/health`)
+      expect(await res.json()).toEqual({ ok: true })
+    } finally {
+      await app.close()
+    }
+  })
+
+  test("TUB_BEHIND_PROXY is off by default and fails closed on unknown values", () => {
+    expect(configFromEnv({}).behindProxy).toBe(false)
+    for (const v of ["", "0", "false"]) expect(configFromEnv({ TUB_BEHIND_PROXY: v }).behindProxy).toBe(false)
+    for (const v of ["1", "true"]) expect(configFromEnv({ TUB_BEHIND_PROXY: v }).behindProxy).toBe(true)
+    for (const v of ["yes", "on", "TRUE"]) expect(() => configFromEnv({ TUB_BEHIND_PROXY: v })).toThrow(/TUB_BEHIND_PROXY/)
   })
 
   test("refuses to start without an initialized database", async () => {

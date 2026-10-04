@@ -170,6 +170,12 @@ export type ServeConfig = {
   port: number
   tlsCert?: string
   tlsKey?: string
+  /**
+   * Allows plain HTTP on a non-loopback address because a TLS-terminating
+   * reverse proxy on a private network (such as a Docker network shared with
+   * Caddy) is the only thing that can reach Tub. Off by default.
+   */
+  behindProxy?: boolean
 }
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"])
@@ -178,10 +184,18 @@ export function isLoopback(host: string): boolean {
   return LOOPBACK_HOSTS.has(host) || /^127\.\d+\.\d+\.\d+$/.test(host)
 }
 
+/** Parses a boolean environment variable, failing closed on anything unrecognized. */
+export function parseEnvFlag(name: string, value: string | undefined): boolean {
+  if (value === undefined || value === "" || value === "0" || value === "false") return false
+  if (value === "1" || value === "true") return true
+  throw new TubError(`${name} must be 1, true, 0 or false, not '${value}'`)
+}
+
 /**
  * Starts the server. Plain HTTP is only allowed on loopback (for local use,
- * or behind a TLS-terminating reverse proxy on the same host); binding any
- * other address requires a TLS certificate and key.
+ * or behind a TLS-terminating reverse proxy on the same host), or with an
+ * explicit behindProxy opt-in; binding any other address otherwise requires
+ * a TLS certificate and key.
  */
 export async function serve(config: ServeConfig) {
   if (!existsSync(config.dbPath)) {
@@ -193,10 +207,11 @@ export async function serve(config: ServeConfig) {
   if (!!config.tlsCert !== !!config.tlsKey) {
     throw new TubError("TLS needs both a certificate and a key")
   }
-  if (!config.tlsCert && !isLoopback(config.host)) {
+  if (!config.tlsCert && !isLoopback(config.host) && !config.behindProxy) {
     throw new TubError(
       `refusing to serve plain HTTP on ${config.host}: TLS is required for remote connections. ` +
-        "Provide --tls-cert and --tls-key, or bind to 127.0.0.1 behind a TLS-terminating reverse proxy.",
+        "Provide --tls-cert and --tls-key, bind to 127.0.0.1 behind a TLS-terminating reverse proxy, " +
+        "or pass --behind-proxy if only a TLS-terminating proxy on a private network can reach this address.",
     )
   }
   const https =
@@ -205,6 +220,11 @@ export async function serve(config: ServeConfig) {
       : undefined
   const app = buildServer({ db: openDb(config.dbPath), logger: { level: "info" }, https })
   await app.listen({ host: config.host, port: config.port })
+  if (!https && !isLoopback(config.host)) {
+    app.log.warn(
+      `serving plain HTTP on ${config.host} (--behind-proxy): make sure only a TLS-terminating proxy can reach this port`,
+    )
+  }
   return app
 }
 
@@ -215,6 +235,7 @@ export function configFromEnv(env: Record<string, string | undefined> = process.
     port: Number(env.TUB_PORT ?? env.PORT ?? 8787),
     tlsCert: env.TUB_TLS_CERT,
     tlsKey: env.TUB_TLS_KEY,
+    behindProxy: parseEnvFlag("TUB_BEHIND_PROXY", env.TUB_BEHIND_PROXY),
   }
 }
 

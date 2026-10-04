@@ -14,8 +14,10 @@ export const USAGE = `usage: tub [--db <path>] <command>
 
 commands:
   init                                     create (or migrate) the database
-  serve [--host H] [--port P] [--tls-cert F --tls-key F]
-                                           run the sync server
+  serve [--host H] [--port P] [--tls-cert F --tls-key F] [--behind-proxy]
+                                           run the sync server; --behind-proxy allows
+                                           plain HTTP on a non-loopback address that
+                                           only a TLS-terminating proxy can reach
   scopes list
   scopes create <name>
   credentials list
@@ -28,7 +30,8 @@ commands:
   backup [<path>]                          consistent copy of the database
 
 The database path is --db, else $TUB_DB, else ./tub.db.
-serve also reads $TUB_HOST, $TUB_PORT, $TUB_TLS_CERT and $TUB_TLS_KEY.`
+serve also reads $TUB_HOST, $TUB_PORT, $TUB_TLS_CERT, $TUB_TLS_KEY and
+$TUB_BEHIND_PROXY (1 or true).`
 
 export type Io = { out: (line: string) => void; err: (line: string) => void }
 
@@ -60,6 +63,7 @@ export async function runCli(argv: string[], io: Io = consoleIo, env = process.e
         port: { type: "string" },
         "tls-cert": { type: "string" },
         "tls-key": { type: "string" },
+        "behind-proxy": { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
     })
@@ -105,6 +109,7 @@ export async function runCli(argv: string[], io: Io = consoleIo, env = process.e
         if (values.port) config.port = Number(values.port)
         if (values["tls-cert"]) config.tlsCert = values["tls-cert"]
         if (values["tls-key"]) config.tlsKey = values["tls-key"]
+        if (values["behind-proxy"]) config.behindProxy = true
         await serve(config)
         return 0
       }

@@ -1,0 +1,9 @@
+# Example Caddyfile block for Tub. Caddy obtains and renews the certificate.
+# "tub" is the container name on the shared Docker network.
+tub.example.com {
+	reverse_proxy tub:8787 {
+		# Send server-sent events (/replication/<scope>/pull/stream) to clients
+		# immediately instead of buffering them.
+		flush_interval -1
+	}
+}

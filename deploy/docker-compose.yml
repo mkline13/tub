@@ -1,0 +1,25 @@
+# Example: Tub on a Docker network it shares with Caddy, with no published
+# port. Caddy terminates TLS and is the only thing that can reach Tub.
+#
+# Assumes Caddy runs in its own compose project attached to an external
+# network named "caddy" (create it once with `docker network create caddy`).
+# Rename it to match your setup.
+services:
+  tub:
+    build:
+      context: ..
+    # or, with a prebuilt image: image: tub:latest
+    container_name: tub
+    restart: unless-stopped
+    volumes:
+      - tub-data:/data
+    networks:
+      - caddy
+    # No `ports:` on purpose. Publishing 8787 would expose plain HTTP.
+
+volumes:
+  tub-data:
+
+networks:
+  caddy:
+    external: true

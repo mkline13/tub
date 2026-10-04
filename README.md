@@ -50,7 +50,7 @@ These were made while implementing the MVP, where SPEC.md leaves a choice open.
 - **Schemas are immutable.** A schema ID always means the same JSON Schema. A new version gets a new ID (`task.v2`). Tombstones are validated like any other document.
 - **Tombstones are kept forever** in the MVP, which is the simplest way to guarantee offline clients cannot resurrect deleted documents.
 - **Secrets are 256-bit random tokens** (`tub_...`) stored as SHA-256 hashes. A slow password hash is unnecessary for random tokens, and a deterministic hash allows an indexed lookup.
-- **TLS is enforced at startup.** `tub serve` refuses to bind a non-loopback address without `--tls-cert` and `--tls-key`. Plain HTTP on `127.0.0.1` is allowed for local use or behind a TLS-terminating reverse proxy on the same host. The client likewise refuses `http://` URLs except for localhost.
+- **TLS is enforced at startup.** `tub serve` refuses to bind a non-loopback address without `--tls-cert` and `--tls-key`. Plain HTTP on `127.0.0.1` is allowed for local use or behind a TLS-terminating reverse proxy on the same host. Plain HTTP on any other address needs an explicit `--behind-proxy` (or `TUB_BEHIND_PROXY=1`), meaning only a TLS-terminating proxy on a private network, such as a Docker network shared with Caddy, can reach it. That keeps SPEC's rule that remote connections use TLS: TLS ends at the proxy, and the unencrypted hop never leaves the host. The flag is off by default, and unrecognized `TUB_BEHIND_PROXY` values are an error. The client likewise refuses `http://` URLs except for localhost.
 - **`@mkline13/tub-shared` is published too**, alongside the client, because the client depends on its types.
 
 ## Layout
@@ -64,6 +64,7 @@ packages/
             src/db                 SQLite access
   client/   @mkline13/tub-client   Thin RxDB replication helper, installable into other apps
             examples/              Example apps
+deploy/     Example docker-compose.yml and Caddyfile (see "Deploying with Docker and Caddy")
 ```
 
 Administration happens through the `tub` CLI on the server machine. There is no web admin UI.
@@ -77,6 +78,7 @@ tub schemas add task.v1 task.schema.json          # a JSON Schema for the docume
 tub credentials create laptop --scope tasks       # prints the secret once
 tub serve                                         # http://127.0.0.1:8787
 tub serve --host 0.0.0.0 --tls-cert cert.pem --tls-key key.pem
+tub serve --host 0.0.0.0 --behind-proxy           # plain HTTP, only for a TLS proxy on a private network
 ```
 
 Other commands: `tub scopes list`, `tub credentials list`, `tub credentials revoke <name>`, `tub schemas list`, `tub schemas show <id>`, and `tub backup [path]`, which writes a consistent copy of the database even while the server is running. After restoring a backup, clients should start replication from scratch, because their checkpoints may point past the restored change history.
@@ -90,6 +92,29 @@ Replication API, all requiring `Authorization: Bearer <secret>`:
 | `GET /replication/<scope>/pull/stream` | Server-sent `RESYNC` notifications |
 | `GET /health` | Liveness check, no auth |
 
+## Deploying with Docker and Caddy
+
+The `Dockerfile` builds a server image that keeps its database at `/data/tub.db` on a volume and serves plain HTTP on port 8787 with `TUB_BEHIND_PROXY=1`. It is meant to sit on a Docker network shared with Caddy, with no published port, so Caddy (which handles certificates) is the only way in. [`deploy/`](deploy) has an example `docker-compose.yml` and `Caddyfile`.
+
+1. Put Caddy and Tub on a shared network. The example assumes an external network named `caddy` (`docker network create caddy`) that your Caddy container also joins. Rename it to match your setup.
+2. Start Tub from a checkout of this repo:
+   ```
+   docker compose -f deploy/docker-compose.yml up -d --build
+   ```
+   The container runs `tub init` on every start, which creates the database the first time and migrates it after upgrades.
+3. Add the site block from `deploy/Caddyfile` to your Caddyfile, with your domain, and reload Caddy. `flush_interval -1` makes Caddy pass the live-sync event stream through without buffering.
+4. Administer with the CLI inside the container:
+   ```
+   docker exec tub tub scopes create tasks
+   docker exec -i tub sh -c 'cat > /tmp/task.json && tub schemas add task.v1 /tmp/task.json' < task.schema.json
+   docker exec tub tub credentials create laptop --scope tasks
+   docker exec tub tub backup /data/tub-backup.db
+   docker cp tub:/data/tub-backup.db .
+   ```
+5. Point clients at `https://<your domain>`.
+
+Don't add a `ports:` mapping for Tub: that would expose plain HTTP on the host. If Caddy runs directly on the host instead of in Docker, publish the port on loopback only (`127.0.0.1:8787:8787`).
+
 ## Development
 
 Requires Bun.
@@ -98,7 +123,7 @@ Requires Bun.
 bun install
 bun test
 bun run typecheck
-bun run --cwd packages/server start   # run the server (reads TUB_DB, TUB_HOST, TUB_PORT, TUB_TLS_CERT, TUB_TLS_KEY)
+bun run --cwd packages/server start   # run the server (reads TUB_DB, TUB_HOST, TUB_PORT, TUB_TLS_CERT, TUB_TLS_KEY, TUB_BEHIND_PROXY)
 bun run --cwd packages/server cli     # run the tub CLI
 ```
 
