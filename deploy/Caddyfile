@@ -7,3 +7,14 @@ tub.example.com {
 		flush_interval -1
 	}
 }
+
+# Or, under a path on a shared domain. Clients then use
+# https://proxy.example.com/tub as their URL.
+#
+# proxy.example.com {
+# 	handle_path /tub/* {
+# 		reverse_proxy tub:8787 {
+# 			flush_interval -1
+# 		}
+# 	}
+# }

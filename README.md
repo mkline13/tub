@@ -113,6 +113,18 @@ The `Dockerfile` builds a server image that keeps its database at `/data/tub.db`
    ```
 5. Point clients at `https://<your domain>`.
 
+Tub can also be served under a path on a shared domain. Strip the prefix in Caddy and give clients the URL with the path, such as `https://proxy.example.com/tub`:
+
+```
+proxy.example.com {
+	handle_path /tub/* {
+		reverse_proxy tub:8787 {
+			flush_interval -1
+		}
+	}
+}
+```
+
 Don't add a `ports:` mapping for Tub: that would expose plain HTTP on the host. If Caddy runs directly on the host instead of in Docker, publish the port on loopback only (`127.0.0.1:8787:8787`).
 
 ## Development

@@ -34,6 +34,23 @@ test("tubSchema describes the Tub document shape", () => {
   expect(schema.required).toEqual(["id", "type", "schema", "data", "updatedAt"])
 })
 
+test("a base URL with a path prefix keeps the prefix", async () => {
+  for (const url of ["https://proxy.example.com/tub", "https://proxy.example.com/tub/"]) {
+    const requested: string[] = []
+    const fetchStub = (async (input: string | URL | Request) => {
+      requested.push(String(input))
+      return new Response(JSON.stringify({ documents: [], checkpoint: null }), { headers: { "content-type": "application/json" } })
+    }) as typeof fetch
+    const rxdb = await createRxDatabase({ name: `prefix${requested.length}${url.length}`, storage: getRxStorageMemory() })
+    const { tasks } = await rxdb.addCollections({ tasks: { schema: tubSchema({ data: TASK }) } })
+    const replication = replicateTub({ url, secret: "s", collection: tasks as RxCollection<Document>, live: false, fetch: fetchStub })
+    await replication.awaitInitialReplication()
+    await replication.cancel()
+    await rxdb.remove()
+    expect(requested[0]).toBe("https://proxy.example.com/tub/replication/tasks/pull?seq=0&limit=100")
+  }
+})
+
 describe("replication against a real Tub server", () => {
   const cleanup: (() => Promise<unknown>)[] = []
   afterEach(async () => {
